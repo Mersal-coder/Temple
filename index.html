@@ -20,6 +20,7 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            scroll-behavior: smooth;
         }
         
         h1 {
@@ -57,6 +58,7 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             text-align: center;
+            scroll-margin-top: 20px;
         }
         
         .progress-bar {
@@ -89,6 +91,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             position: relative;
+            scroll-margin-top: 20px;
         }
         
         .week:hover {
@@ -104,6 +107,10 @@
         .week.missed {
             background-color: var(--missed);
             color: white;
+        }
+        
+        .week.current {
+            border: 3px solid var(--primary);
         }
         
         .week-number {
@@ -173,7 +180,7 @@
         </div>
     </div>
     
-    <div class="progress">
+    <div class="progress" id="progressSection">
         <h2>Your Progress</h2>
         <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
@@ -242,12 +249,43 @@
             return date;
         }
         
+        // Find the current or next pending week
+        function findCurrentOrNextPendingWeek() {
+            const currentDate = new Date();
+            let currentWeekIndex = -1;
+            let nextPendingIndex = -1;
+            
+            // First, find the current week or the closest future week
+            for (let i = 0; i < totalWeeks; i++) {
+                const weekDate = getWednesdayForWeek(i);
+                if (weekDate >= currentDate && (currentWeekIndex === -1 || weekDate < getWednesdayForWeek(currentWeekIndex))) {
+                    currentWeekIndex = i;
+                }
+            }
+            
+            // If we found a current week, check if it's pending
+            if (currentWeekIndex !== -1 && visits[currentWeekIndex] === null) {
+                return currentWeekIndex;
+            }
+            
+            // If current week is not pending, find the next pending week
+            for (let i = 0; i < totalWeeks; i++) {
+                if (visits[i] === null && (nextPendingIndex === -1 || i < nextPendingIndex)) {
+                    nextPendingIndex = i;
+                }
+            }
+            
+            // Return the current week if no pending weeks found
+            return nextPendingIndex !== -1 ? nextPendingIndex : (currentWeekIndex !== -1 ? currentWeekIndex : 0);
+        }
+        
         // Generate weeks display
         function generateWeeks() {
             const container = document.getElementById('weeksContainer');
             container.innerHTML = '';
             
             const currentDate = new Date();
+            const currentOrNextPendingWeek = findCurrentOrNextPendingWeek();
             
             for (let i = 0; i < totalWeeks; i++) {
                 const weekDate = getWednesdayForWeek(i);
@@ -255,11 +293,17 @@
                 
                 const weekElement = document.createElement('div');
                 weekElement.className = 'week';
+                weekElement.id = `week-${i}`;
                 
                 if (visits[i] === true) {
                     weekElement.classList.add('completed');
                 } else if (visits[i] === false && isPast) {
                     weekElement.classList.add('missed');
+                }
+                
+                // Mark the current/next pending week
+                if (i === currentOrNextPendingWeek) {
+                    weekElement.classList.add('current');
                 }
                 
                 weekElement.innerHTML = `
@@ -276,6 +320,27 @@
             }
             
             updateProgress();
+            
+            // Scroll to the current/next pending week after a short delay
+            setTimeout(() => {
+                scrollToCurrentWeek(currentOrNextPendingWeek);
+            }, 300);
+        }
+        
+        // Scroll to the current week
+        function scrollToCurrentWeek(weekIndex) {
+            const weekElement = document.getElementById(`week-${weekIndex}`);
+            if (weekElement) {
+                weekElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        // Scroll to progress section
+        function scrollToProgress() {
+            const progressSection = document.getElementById('progressSection');
+            if (progressSection) {
+                progressSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
         
         // Toggle week status (completed/missed/pending)
@@ -290,6 +355,33 @@
             
             saveData();
             generateWeeks();
+            
+            // Find the next pending week to scroll to
+            const nextPendingIndex = findNextPendingWeek(weekIndex);
+            if (nextPendingIndex !== -1) {
+                setTimeout(() => {
+                    scrollToCurrentWeek(nextPendingIndex);
+                }, 300);
+            }
+        }
+        
+        // Find the next pending week after the current one
+        function findNextPendingWeek(currentIndex) {
+            // First try to find the next pending week after the current one
+            for (let i = currentIndex + 1; i < totalWeeks; i++) {
+                if (visits[i] === null) {
+                    return i;
+                }
+            }
+            
+            // If not found, try to find any pending week
+            for (let i = 0; i < totalWeeks; i++) {
+                if (i !== currentIndex && visits[i] === null) {
+                    return i;
+                }
+            }
+            
+            return -1; // No pending weeks found
         }
         
         // Update progress display
@@ -328,6 +420,9 @@
             
             saveData();
             generateWeeks();
+            
+            // Scroll to progress section after updating settings
+            scrollToProgress();
         }
         
         // Reset all data
@@ -336,6 +431,9 @@
                 visits = Array(totalWeeks).fill(null);
                 saveData();
                 generateWeeks();
+                
+                // Scroll to progress section after reset
+                scrollToProgress();
             }
         }
         
@@ -347,6 +445,9 @@
             // Set up event listeners
             document.getElementById('updateSettings').addEventListener('click', updateSettings);
             document.getElementById('resetTracker').addEventListener('click', resetTracker);
+            
+            // Scroll to progress section on initial load
+            setTimeout(scrollToProgress, 100);
         }
         
         // Start the app when DOM is loaded
@@ -354,3 +455,4 @@
     </script>
 </body>
 </html>
+
